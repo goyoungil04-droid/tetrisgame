@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>유아용 테트리스</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            background-color: #fdf2f8; /* Soft pink background */
+            touch-action: none; /* Prevent double-tap zoom on mobile */
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* The Game Board */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(20, 1fr);
+            gap: 2px;
+            background-color: #fff;
+            border: 8px solid #fbcfe8;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 90vw;
+            max-width: 300px;
+            height: calc(90vw * 2);
+            max-height: 600px;
+            margin-bottom: 20px;
+            padding: 4px;
+        }
+
+        /* Individual Block Cells */
+        .cell {
+            background-color: #f3f4f6; /* Empty cell color */
+            border-radius: 4px;
+            transition: background-color 0.1s;
+        }
+
+        /* Control Buttons Container */
+        #controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 10px;
+            width: 90vw;
+            max-width: 350px;
+        }
+
+        /* Big, friendly buttons */
+        .control-btn {
+            background-color: #a78bfa;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 6px 0 #7c3aed, 0 10px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .control-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 #7c3aed;
+        }
+
+        #btn-left { grid-column: 1; grid-row: 2; background-color: #60a5fa; box-shadow: 0 6px 0 #2563eb; }
+        #btn-rotate { grid-column: 2; grid-row: 1; background-color: #f472b6; box-shadow: 0 6px 0 #db2777; }
+        #btn-down { grid-column: 2; grid-row: 2; background-color: #34d399; box-shadow: 0 6px 0 #059669; }
+        #btn-right { grid-column: 3; grid-row: 2; background-color: #60a5fa; box-shadow: 0 6px 0 #2563eb; }
+        
+        #btn-left:active { box-shadow: 0 0 0 #2563eb; transform: translateY(6px); }
+        #btn-rotate:active { box-shadow: 0 0 0 #db2777; transform: translateY(6px); }
+        #btn-down:active { box-shadow: 0 0 0 #059669; transform: translateY(6px); }
+        #btn-right:active { box-shadow: 0 0 0 #2563eb; transform: translateY(6px); }
+
+        /* Score Display */
+        #score-board {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4b5563;
+            margin-bottom: 10px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 4px solid #fed7aa;
+        }
+
+        /* Overlay Messages (Game Over, Start) */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #overlay-message {
+            font-size: 40px;
+            color: #ec4899;
+            margin-bottom: 20px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #start-btn {
+            background-color: #fbbf24;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 20px 40px;
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 8px 0 #d97706, 0 15px 20px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        #start-btn:active {
+            transform: translateY(8px);
+            box-shadow: 0 0 0 #d97706;
+        }
+        
+        .hidden { display: none !important; }
+
+        /* Colors for the blocks */
+        .color-0 { background-color: #f3f4f6; } /* Empty */
+        .color-1 { background-color: #fb7185; border: 2px solid #e11d48; } /* I */
+        .color-2 { background-color: #fb923c; border: 2px solid #ea580c; } /* J */
+        .color-3 { background-color: #facc15; border: 2px solid #ca8a04; } /* L */
+        .color-4 { background-color: #4ade80; border: 2px solid #16a34a; } /* O */
+        .color-5 { background-color: #38bdf8; border: 2px solid #0284c7; } /* S */
+        .color-6 { background-color: #818cf8; border: 2px solid #4f46e5; } /* T */
+        .color-7 { background-color: #c084fc; border: 2px solid #9333ea; } /* Z */
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="score-board">별점: <span id="score">0</span> 🌟</div>
+    
+    <div id="board"></div>
+    
+    <div id="controls">
+        <button id="btn-left" class="control-btn">⬅️</button>
+        <button id="btn-rotate" class="control-btn">🔄</button>
+        <button id="btn-right" class="control-btn">➡️</button>
+        <button id="btn-down" class="control-btn">⬇️</button>
+    </div>
+</div>
+
+<div id="overlay">
+    <div id="overlay-message">재미있는 블록 놀이!</div>
+    <button id="start-btn">시작하기 ▶️</button>
+</div>
+
+<script>
+    const ROWS = 20;
+    const COLS = 10;
+    const BLOCK_SIZE = 30; // Not strictly used for rendering here due to CSS Grid, but good for logic
+    let board = [];
+    let score = 0;
+    let gameInterval;
+    let isGameOver = false;
+    let isPaused = false;
+    let dropSpeed = 1000; // Very slow for kids (1 second per drop)
+
+    const boardElement = document.getElementById('board');
+    const scoreElement = document.getElementById('score');
+    const overlay = document.getElementById('overlay');
+    const overlayMessage = document.getElementById('overlay-message');
+    const startBtn = document.getElementById('start-btn');
+
+    // Tetromino definitions
+    // 1:I, 2:J, 3:L, 4:O, 5:S, 6:T, 7:Z
+    const TETROMINOES = [
+        [], // Empty 0
+        // I
+        [
+            [0,0,0,0],
+            [1,1,1,1],
+            [0,0,0,0],
+            [0,0,0,0]
+        ],
+        // J
+        [
+            [2,0,0],
+            [2,2,2],
+            [0,0,0]
+        ],
+        // L
+        [
+            [0,0,3],
+            [3,3,3],
+            [0,0,0]
+        ],
+        // O
+        [
+            [4,4],
+            [4,4]
+        ],
+        // S
+        [
+            [0,5,5],
+            [5,5,0],
+            [0,0,0]
+        ],
+        // T
+        [
+            [0,6,0],
+            [6,6,6],
+            [0,0,0]
+        ],
+        // Z
+        [
+            [7,7,0],
+            [0,7,7],
+            [0,0,0]
+        ]
+    ];
+
+    let currentPiece = null;
+
+    // Initialize the game board
+    function initBoard() {
+        boardElement.innerHTML = '';
+        board = [];
+        for (let r = 0; r < ROWS; r++) {
+            let row = [];
+            for (let c = 0; c < COLS; c++) {
+                row.push(0);
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.id = `cell-${r}-${c}`;
+                boardElement.appendChild(cell);
+            }
+            board.push(row);
+        }
+    }
+
+    // Draw the board and current piece
+    function draw() {
+        // Clear previous drawing
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const cell = document.getElementById(`cell-${r}-${c}`);
+                cell.className = 'cell color-' + board[r][c];
+            }
+        }
+
+        // Draw current piece
+        if (currentPiece) {
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c] !== 0) {
+                        const boardY = currentPiece.y + r;
+                        const boardX = currentPiece.x + c;
+                        // Only draw if within bounds
+                        if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+                            const cell = document.getElementById(`cell-${boardY}-${boardX}`);
+                            if(cell) {
+                                cell.className = 'cell color-' + currentPiece.shape[r][c];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Generate a new random piece
+    function spawnPiece() {
+        const typeId = Math.floor(Math.random() * 7) + 1;
+        const shape = TETROMINOES[typeId];
+        currentPiece = {
+            shape: shape,
+            x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2),
+            y: 0,
+            type: typeId
+        };
+
+        // Check if spawn position is blocked (Game Over)
+        if (checkCollision(currentPiece.x, currentPiece.y, currentPiece.shape)) {
+            gameOver();
+        }
+    }
+
+    // Check for collisions
+    function checkCollision(x, y, shape) {
+        for (let r = 0; r < shape.length; r++) {
+            for (let c = 0; c < shape[r].length; c++) {
+                if (shape[r][c] !== 0) {
+                    let newX = x + c;
+                    let newY = y + r;
+
+                    // Hit walls
+                    if (newX < 0 || newX >= COLS) return true;
+                    // Hit floor
+                    if (newY >= ROWS) return true;
+                    // Hit other blocks (only if above floor)
+                    if (newY >= 0 && board[newY][newX] !== 0) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Move piece down
+    function moveDown() {
+        if (!currentPiece || isGameOver) return;
+        
+        if (!checkCollision(currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
+            currentPiece.y++;
+        } else {
+            lockPiece();
+        }
+        draw();
+    }
+
+    // Move piece left/right
+    function move(dir) {
+        if (!currentPiece || isGameOver) return;
+        
+        if (!checkCollision(currentPiece.x + dir, currentPiece.y, currentPiece.shape)) {
+            currentPiece.x += dir;
+            draw();
+        }
+    }
+
+    // Rotate piece
+    function rotate() {
+        if (!currentPiece || isGameOver) return;
+        
+        const rotatedShape = [];
+        const N = currentPiece.shape.length;
+        for (let i = 0; i < N; i++) {
+            rotatedShape.push(new Array(N).fill(0));
+        }
+
+        for (let r = 0; r < N; r++) {
+            for (let c = 0; c < N; c++) {
+                rotatedShape[c][N - 1 - r] = currentPiece.shape[r][c];
+            }
+        }
+
+        // Basic wall kick (prevent rotating into walls)
+        if (!checkCollision(currentPiece.x, currentPiece.y, rotatedShape)) {
+            currentPiece.shape = rotatedShape;
+        } else {
+            // Try shifting left or right if against a wall
+            if (!checkCollision(currentPiece.x - 1, currentPiece.y, rotatedShape)) {
+                currentPiece.x--;
+                currentPiece.shape = rotatedShape;
+            } else if (!checkCollision(currentPiece.x + 1, currentPiece.y, rotatedShape)) {
+                currentPiece.x++;
+                currentPiece.shape = rotatedShape;
+            }
+        }
+        draw();
+    }
+
+    // Lock piece in place and check for lines
+    function lockPiece() {
+        for (let r = 0; r < currentPiece.shape.length; r++) {
+            for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                if (currentPiece.shape[r][c] !== 0) {
+                    let boardY = currentPiece.y + r;
+                    let boardX = currentPiece.x + c;
+                    // Game over if locked above board
+                    if (boardY < 0) {
+                        gameOver();
+                        return;
+                    }
+                    board[boardY][boardX] = currentPiece.shape[r][c];
+                }
+            }
+        }
+        
+        clearLines();
+        spawnPiece();
+    }
+
+    // Clear completed lines
+    function clearLines() {
+        let linesCleared = 0;
+        for (let r = ROWS - 1; r >= 0; r--) {
+            let isFull = true;
+            for (let c = 0; c < COLS; c++) {
+                if (board[r][c] === 0) {
+                    isFull = false;
+                    break;
+                }
+            }
+            if (isFull) {
+                // Remove the row
+                board.splice(r, 1);
+                // Add empty row at top
+                board.unshift(new Array(COLS).fill(0));
+                linesCleared++;
+                // Check same row again since everything shifted down
+                r++; 
+            }
+        }
+
+        if (linesCleared > 0) {
+            score += linesCleared;
+            scoreElement.innerText = score;
+            // Optionally slightly increase speed, but keep it slow for kids
+            if(dropSpeed > 600) dropSpeed -= 20; 
+            clearInterval(gameInterval);
+            gameInterval = setInterval(moveDown, dropSpeed);
+        }
+    }
+
+    function gameOver() {
+        isGameOver = true;
+        clearInterval(gameInterval);
+        overlayMessage.innerText = "앗, 다 찼어요!\n별점: " + score + "개";
+        startBtn.innerText = "다시 하기 🔁";
+        overlay.classList.remove('hidden');
+    }
+
+    function startGame() {
+        initBoard();
+        score = 0;
+        scoreElement.innerText = score;
+        isGameOver = false;
+        dropSpeed = 1200; // Slow start
+        overlay.classList.add('hidden');
+        spawnPiece();
+        draw();
+        
+        if (gameInterval) clearInterval(gameInterval);
+        gameInterval = setInterval(moveDown, dropSpeed);
+    }
+
+    // Event Listeners for Buttons (Click and Touch)
+    function addControlListener(elementId, action) {
+        const el = document.getElementById(elementId);
+        // Prevent default touch behavior (like zooming) and trigger action
+        el.addEventListener('touchstart', (e) => { e.preventDefault(); action(); }, {passive: false});
+        el.addEventListener('mousedown', (e) => { e.preventDefault(); action(); });
+    }
+
+    addControlListener('btn-left', () => move(-1));
+    addControlListener('btn-right', () => move(1));
+    addControlListener('btn-down', moveDown);
+    addControlListener('btn-rotate', rotate);
+
+    // Keyboard support for desktop testing
+    document.addEventListener('keydown', (e) => {
+        if (isGameOver) return;
+        switch (e.key) {
+            case 'ArrowLeft': move(-1); break;
+            case 'ArrowRight': move(1); break;
+            case 'ArrowDown': moveDown(); break;
+            case 'ArrowUp': rotate(); break;
+        }
+    });
+
+    startBtn.addEventListener('click', startGame);
+
+    // Initial setup
+    initBoard();
+</script>
+</body>
+</html>
